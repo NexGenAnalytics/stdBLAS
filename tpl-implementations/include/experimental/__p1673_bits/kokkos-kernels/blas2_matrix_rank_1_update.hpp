@@ -3,7 +3,7 @@
 
 namespace KokkosKernelsSTD {
 
-namespace detail {
+namespace Impl {
 
 // manages parallel execution of independent action
 // called like action(i, j) for each matrix element A(i, j)
@@ -43,7 +43,21 @@ void for_each_matrix_element(ExecSpace &&exec, MatrixType &A, ActionType action)
   exec.fence();
 }
 
-} // namespace detail
+// TODO: add 2D matrix accessor ?
+//       think of ..idx multi-rank accessor ?
+template <typename Accessor>
+auto make_view_accessor(auto &view, Accessor acc) {
+  return [&view, acc](const auto idx) {
+    // Note: we cast pointers because view scalar may be Kokkos::complex<T>
+    //       while accessor works with std::complex<T> ...
+    // TODO: can this be solved with complex-converting instantiations instead ?
+    using elem_t = typename Accessor::element_type;
+    const auto p = reinterpret_cast<elem_t*>(view.data() + idx);
+    return acc.access(p, 0);
+  };
+}
+
+} // namespace Impl
 
 // Performs BLAS xGER/xGERU (for real/complex types):
 // A[i,j] += x[i] * y[j]
@@ -51,22 +65,19 @@ template<class ExecSpace,
          class ElementType_x,
          std::experimental::extents<>::size_type ext_x,
          class Layout_x,
-         // class Accessor_x,
+         class Accessor_x,
          class ElementType_y,
          std::experimental::extents<>::size_type ext_y,
          class Layout_y,
-         // class Accessor_y,
+         class Accessor_y,
          class ElementType_A,
          std::experimental::extents<>::size_type numRows_A,
          std::experimental::extents<>::size_type numCols_A,
          class Layout_A>
-         // class Accessor_A>
 void matrix_rank_1_update(kokkos_exec<ExecSpace> &&/* exec */,
-  std::experimental::mdspan<ElementType_x, std::experimental::extents<ext_x>, Layout_x, // Accessor_x
-    std::experimental::default_accessor<ElementType_x>> x,
-  std::experimental::mdspan<ElementType_y, std::experimental::extents<ext_y>, Layout_y, // Accessor_y
-    std::experimental::default_accessor<ElementType_y>> y,
-  std::experimental::mdspan<ElementType_A, std::experimental::extents<numRows_A, numCols_A>, Layout_A, // Accessor_A
+  std::experimental::mdspan<ElementType_x, std::experimental::extents<ext_x>, Layout_x, Accessor_x> x,
+  std::experimental::mdspan<ElementType_y, std::experimental::extents<ext_y>, Layout_y, Accessor_y> y,
+  std::experimental::mdspan<ElementType_A, std::experimental::extents<numRows_A, numCols_A>, Layout_A,
     std::experimental::default_accessor<ElementType_A>> A)
 {
   // constraints
@@ -86,13 +97,16 @@ void matrix_rank_1_update(kokkos_exec<ExecSpace> &&/* exec */,
   std::cout << "matrix_rank1_update: kokkos impl\n";
 #endif
 
-  auto x_view = Impl::mdspan_to_view(x);
-  auto y_view = Impl::mdspan_to_view(y);
+  // convert mdspans to views and wrap input with original accessors
+  const auto x_view = Impl::mdspan_to_view(x);
+  const auto y_view = Impl::mdspan_to_view(y);
+  const auto op_x = Impl::make_view_accessor(x_view, x.accessor());
+  const auto op_y = Impl::make_view_accessor(y_view, y.accessor());
   auto A_view = Impl::mdspan_to_view(A);
 
-  detail::for_each_matrix_element(ExecSpace(), A,
+  Impl::for_each_matrix_element(ExecSpace(), A_view,
     KOKKOS_LAMBDA(const auto i, const auto j) {
-      A_view(i, j) += x_view(i) * y_view(j);
+      A_view(i, j) += op_x(i) * op_y(j);
     });
 }
 
