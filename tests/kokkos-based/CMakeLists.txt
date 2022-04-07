@@ -43,3 +43,6 @@ macro(linalg_add_test_kokkos TESTNAME FINDSTR)
 endmacro()
 
 # add tests below
+linalg_add_test_kokkos(
+  symmetric_matrix_rank1_update_kokkos
+  "symmetric_matrix_rank1_update: kokkos impl")
