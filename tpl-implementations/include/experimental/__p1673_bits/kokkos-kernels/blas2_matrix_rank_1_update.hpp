@@ -120,18 +120,18 @@ inline constexpr bool is_layout_blas_packed_v = is_layout_blas_packed<Layout>::v
 
 // Note: will only signal failure for layout_blas_packed with diferent triangle
 template <typename Layout, typename Triangle>
-struct triangle_layout_mismatch: public std::false_type {};
+struct triangle_layout_match: public std::true_type {};
 
 template <typename StorageOrder, typename Triangle1, typename Triangle2>
-struct triangle_layout_mismatch<
+struct triangle_layout_match<
   std::experimental::linalg::layout_blas_packed<Triangle1, StorageOrder>,
   Triangle2>
 {
-  static constexpr bool value = !std::is_same_v<Triangle1, Triangle2>;
+  static constexpr bool value = std::is_same_v<Triangle1, Triangle2>;
 };
 
 template <typename Layout, typename Triangle>
-inline constexpr bool triangle_layout_mismatch_v = triangle_layout_mismatch<Layout, Triangle>::value;
+inline constexpr bool triangle_layout_match_v = triangle_layout_match<Layout, Triangle>::value;
 
 };
 
@@ -159,7 +159,7 @@ void symmetric_matrix_rank_1_update(kokkos_exec<ExecSpace> &&exec,
   // constraints
   static_assert(A.rank() == 2);
   static_assert(x.rank() == 1);
-  static_assert(!Impl::triangle_layout_mismatch_v<Layout_A, Triangle>);
+  static_assert(Impl::triangle_layout_match_v<Layout_A, Triangle>);
 
   // preconditions
   if ( A.extent(0) != A.extent(1) ){
