@@ -133,6 +133,15 @@ struct triangle_layout_match<
 template <typename Layout, typename Triangle>
 inline constexpr bool triangle_layout_match_v = triangle_layout_match<Layout, Triangle>::value;
 
+template <class size_type>
+KOKKOS_INLINE_FUNCTION
+constexpr bool static_extent_match(size_type extent1, size_type extent2)
+{
+  return extent1 == std::experimental::dynamic_extent ||
+         extent2 == std::experimental::dynamic_extent ||
+         extent1 == extent2;
+}
+
 };
 
 // Rank-1 update of a Symmetric matrix
@@ -156,12 +165,16 @@ void symmetric_matrix_rank_1_update(kokkos_exec<ExecSpace> &&exec,
     std::experimental::default_accessor<ElementType_A>> A,
   Triangle t)
 {
-  // constraints
+  // P1673 constraints (reduntant to mdspan extents in the header)
   static_assert(A.rank() == 2);
   static_assert(x.rank() == 1);
   static_assert(Impl::triangle_layout_match_v<Layout_A, Triangle>);
 
-  // preconditions
+  // P1673 mandates
+  static_assert(Impl::static_extent_match(A.static_extent(0), A.static_extent(1)));
+  static_assert(Impl::static_extent_match(A.static_extent(0), x.static_extent(0)));
+
+  // P1673 preconditions
   if ( A.extent(0) != A.extent(1) ){
     throw std::runtime_error("KokkosBlas: symmetric_matrix_rank_1_update: A.extent(0) != A.extent(1)");
   }
