@@ -81,15 +81,6 @@ public:
   }
 
 private:
-
-  template <typename T>
-  KOKKOS_INLINE_FUNCTION
-  static bool is_int_mul_safe(T a, T b) {
-    static constexpr auto max_val = std::numeric_limits<decltype(a * b)>::max();
-    return a <= max_val / b;
-  }
-
-private:
   ExecSpace exec;
   MatrixType A;
   size_t ext0;
