@@ -50,34 +50,17 @@ namespace{
 // Utilities
 ////////////////////////////////////////////////////////////
 
-// create rank-1 mdspan (vector)
-template <typename value_type,
-          typename mdspan_t = typename _blas2_signed_fixture<value_type>::mdspan_r1_t>
-inline mdspan_t make_mdspan(value_type *data, std::size_t ext) {
-  return mdspan_t(data, ext);
-}
-
-template <typename value_type,
-          typename mdspan_t = typename _blas2_signed_fixture<const value_type>::mdspan_r1_t>
-inline mdspan_t make_mdspan(const value_type *data, std::size_t ext) {
-  return mdspan_t(data, ext);
-}
-
 template <typename value_type>
 inline auto make_mdspan(std::vector<value_type> &v) {
-  return make_mdspan(v.data(), v.size());
+  return std::experimental::mdspan(v.data(), v.size());
 }
 
 template <typename value_type>
 inline auto make_mdspan(const std::vector<value_type> &v) {
-  return make_mdspan(v.data(), v.size());
-}
-
-// create rank-2 mdspan (matrix)
-template <typename value_type,
-          typename mdspan_t = typename _blas2_signed_fixture<value_type>::mdspan_r2_t>
-inline mdspan_t make_mdspan(value_type *data, std::size_t ext0, std::size_t ext1) {
-  return mdspan_t(data, ext0, ext1);
+  using mdspan_c1 = std::experimental::mdspan<
+                        const value_type,
+                        std::experimental::dextents<1>>; // FIXME: mdspan CTAD ?
+  return mdspan_c1(v.data(), v.size());
 }
 
 template <typename ElementType1,
@@ -258,8 +241,10 @@ void test_kokkos_matrix_update(const x_t &x, A_t &A, gold_t get_gold, action_t a
   auto x_preKernel = kokkostesting::create_stdvector_and_copy(x);
 
   // compute gold
+  using mdspan2 = std::experimental::mdspan<value_type,
+                      std::experimental::dextents<2>>; // FIXME: mdspan CTAD ?
   auto A_copy = kokkostesting::create_stdvector_and_copy_rowwise(A);
-  auto A_gold = make_mdspan(A_copy.data(), A.extent(0), A.extent(1));
+  auto A_gold = mdspan2(A_copy.data(), A.extent(0), A.extent(1));
   get_gold(A_gold);
 
   // run tested routine
